@@ -308,7 +308,12 @@ set -e # stop if an error occurs
 restream_options="-h $height -w $width -b $bytes_per_pixel -f $fb_file -s $skip_offset"
 
 if "$cursor"; then
-    restream_options="$restream_options -c${pen_orientation_opt:+ $pen_orientation_opt}"
+    if [ -n "$pen_orientation_opt" ] && ssh_cmd "PATH=\"\$PATH:/opt/bin/:.\" restream --help 2>&1 | grep -q pen-orientation"; then
+        restream_options="$restream_options -c $pen_orientation_opt"
+    else
+        [ -n "$pen_orientation_opt" ] && echo "[reStream] Warning: restream binary on device does not support --pen-orientation; cursor will be misaligned on fw 3.27+. Reinstall restream.arm.static to fix." >&2
+        restream_options="$restream_options -c"
+    fi
 fi
 
 # shellcheck disable=SC2089
