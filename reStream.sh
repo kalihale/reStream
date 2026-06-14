@@ -9,6 +9,7 @@ version="1.5.0"
 
 rm2_firmware_version_3_7="3.7.0.1930"
 rm2_firmware_version_3_24="3.24"
+rm2_firmware_version_3_27="3.27"
 
 # default values for arguments
 remarkable="${REMARKABLE_IP:-10.11.99.1}" # remarkable IP address
@@ -156,6 +157,7 @@ if ! ssh_cmd true; then
     exit 1
 fi
 
+pen_orientation_opt=""
 rm_version="$(ssh_cmd cat /sys/devices/soc0/machine)"
 
 case "$rm_version" in
@@ -192,6 +194,10 @@ case "$rm_version" in
                 width=$tmp
 
                 skip_offset=2629636
+
+                if is_current_rm_firmware_version_ge $rm2_firmware_version_3_27; then
+                    pen_orientation_opt="--pen-orientation portrait180"
+                fi
             # Use the previous video settings.
             elif is_current_rm_firmware_version_ge $rm2_firmware_version_3_7; then
                 echo "Using the older :mem: video settings."
@@ -302,7 +308,7 @@ set -e # stop if an error occurs
 restream_options="-h $height -w $width -b $bytes_per_pixel -f $fb_file -s $skip_offset"
 
 if "$cursor"; then
-    restream_options="$restream_options -c"
+    restream_options="$restream_options -c${pen_orientation_opt:+ $pen_orientation_opt}"
 fi
 
 # shellcheck disable=SC2089
