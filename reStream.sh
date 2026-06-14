@@ -9,11 +9,10 @@ version="1.5.0"
 
 rm2_firmware_version_3_7="3.7.0.1930"
 rm2_firmware_version_3_24="3.24"
-rm2_firmware_version_3_27="3.27.1.0"
 
 # default values for arguments
 remarkable="${REMARKABLE_IP:-10.11.99.1}" # remarkable IP address
-landscape=true                            # rotate 90 degrees to the right
+portrait=true                             # rotate 90 degrees to the right
 cursor=false                              # show a cursor where the pen is hovering
 output_path=-                             # display output through ffplay
 format=-                                  # automatic output format
@@ -33,8 +32,8 @@ while [ $# -gt 0 ]; do
             echo "reStream version: v$version"
             exit
             ;;
-        -p | --portrait)
-            landscape=false
+        -l | --landscape)
+            portrait=false
             shift
             ;;
         -c | --cursor)
@@ -107,8 +106,8 @@ while [ $# -gt 0 ]; do
         -h | --help | *)
             echo "Usage: $0 [-p] [-c] [-u] [-s <source>] [-o <output>] [-f <format>] [-t <title>] [-m] [-w] [-d] [--hflip]"
             echo "Examples:"
-            echo "	$0                               # live view in landscape"
-            echo "	$0 -p                            # live view in portrait"
+            echo "	$0                               # live view in portrait"
+            echo "	$0 -l                            # live view in landscape"
             echo "	$0 -c                            # show a cursor where the pen is hovering (rM2 only)"
             echo "	$0 -s 192.168.0.10               # connect to different IP"
             echo "	$0 -o remarkable.mp4             # record to a file"
@@ -181,23 +180,12 @@ case "$rm_version" in
             height=1404
             fb_file=":mem:"
 
-            # Use updated video settings?
-            if is_current_rm_firmware_version_ge $rm2_firmware_version_3_27; then
-                echo "Using the 3.27+ :mem: video settings."
+		# Use updated video settings?
+            if is_current_rm_firmware_version_ge $rm2_firmware_version_3_24; then
+                echo "Using the newer :mem: video settings."
                 bytes_per_pixel=4
                 pixel_format="bgra"
                 video_filters="$video_filters,transpose=1"
-
-                tmp=$height
-                height=$width
-                width=$tmp
-
-                skip_offset=4705256
-            elif is_current_rm_firmware_version_ge $rm2_firmware_version_3_24; then
-                echo "Using the 3.24+ :mem: video settings."
-                bytes_per_pixel=4
-                pixel_format="bgra"
-                video_filters="$video_filters,transpose=2"
 
                 tmp=$height
                 height=$width
@@ -247,7 +235,7 @@ if ! lz4 -V >/dev/null; then
 fi
 
 # check if restream binay is present on remarkable
-if ssh_cmd "[ ! -f ~/restream ] && [ ! -f /opt/bin/restream ] && [ ! -f /home/root/.vellum/bin/restream ]"; then
+if ssh_cmd "[ ! -f ~/restream ] && [ ! -f /opt/bin/restream ]"; then
     echo "The restream binary is not installed on your reMarkable."
     echo "Please install it using the instruction in the README:"
     echo "https://github.com/rien/reStream/#installation"
@@ -270,8 +258,8 @@ fi
 # store extra ffmpeg arguments in $@
 set --
 
-# rotate 90 degrees if landscape=true
-$landscape && video_filters="$video_filters,transpose=1"
+# rotate 90 degrees if portrait=true
+$portrait && video_filters="$video_filters,transpose=2"
 
 # Scale and add padding if we are targeting a webcam because a lot of services
 # expect a size of exactly 1280x720 (tested in Firefox, MS Teams, and Skype for
@@ -318,7 +306,7 @@ if "$cursor"; then
 fi
 
 # shellcheck disable=SC2089
-restream_rs="PATH=\"\$PATH:/opt/bin/:/home/root/.vellum/bin:.\" restream $restream_options"
+restream_rs="PATH=\"\$PATH:/opt/bin/:.\" restream $restream_options"
 if $unsecure_connection; then
     listen_port=16789
     ssh_cmd "$restream_rs --listen $listen_port" &
