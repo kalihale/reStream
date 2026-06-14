@@ -68,6 +68,7 @@ class PenTracker(threading.Thread):
         self.near = False     # pen in hover range
         self.pressed = False  # pen touching the screen
         self.trail = deque()  # recent positions: (x, y, timestamp)
+        self._trail_lock = threading.Lock()
 
     def run(self):
         cmd = ["ssh", *SSH_OPTIONS, "root@%s" % self.host, "cat", self.device]
@@ -95,11 +96,13 @@ class PenTracker(threading.Thread):
                     pos = self._map(wx, wy)
                     self.pos = pos
                     if self.near:
-                        self.trail.append((pos[0], pos[1], time.monotonic()))
+                        with self._trail_lock:
+                            self.trail.append((pos[0], pos[1], time.monotonic()))
             elif e_type == EV_KEY and e_code == BTN_TOOL_PEN:
                 self.near = bool(e_value)
                 if e_value:
-                    self.trail.clear()
+                    with self._trail_lock:
+                        self.trail.clear()
                     wx = wy = None  # discard stale coords; wait for a fresh pair
 
     def _map(self, wx, wy):
@@ -307,17 +310,19 @@ def main():
 
         if pen is not None:
             now = time.monotonic()
-            while pen.trail and now - pen.trail[0][2] > TRAIL_SECONDS:
-                pen.trail.popleft()
+            with pen._trail_lock:
+                while pen.trail and now - pen.trail[0][2] > TRAIL_SECONDS:
+                    pen.trail.popleft()
+                trail_snap = list(pen.trail)
 
             # draw the cursor only while the pen is present, but keep drawing the
             # trail until it ages out so it fades normally after the pen lifts
             draw_cursor = pen.near and pen.pos is not None
-            if pen.trail or draw_cursor:
+            if trail_snap or draw_cursor:
                 overlay = pygame.Surface((window_w, window_h), pygame.SRCALPHA)
                 radius = max(3.0, args.pen_size * scale / 2)
                 points = []
-                for x, y, t in pen.trail:
+                for x, y, t in trail_snap:
                     rx, ry = rotate_point(x, y, fw, fh, args.rotate)
                     points.append((offset_x + rx * scale, offset_y + ry * scale, t))
                 for (x1, y1, _), (x2, y2, t2) in zip(points, points[1:]):
