@@ -195,9 +195,6 @@ case "$rm_version" in
 
                 skip_offset=2629636
 
-                if is_current_rm_firmware_version_ge $rm2_firmware_version_3_27; then
-                    pen_orientation_opt="--pen-orientation portrait180"
-                fi
             # Use the previous video settings.
             elif is_current_rm_firmware_version_ge $rm2_firmware_version_3_7; then
                 echo "Using the older :mem: video settings."
