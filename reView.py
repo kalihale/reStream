@@ -56,12 +56,11 @@ SSH_OPTIONS = [
 class PenTracker(threading.Thread):
     """Reads raw evdev events from the tablet and keeps the latest pen state."""
 
-    def __init__(self, host, device, frame_size, landscape, threshold):
+    def __init__(self, host, device, frame_size, threshold):
         super().__init__(daemon=True)
         self.host = host
         self.device = device
         self.frame_size = frame_size
-        self.landscape = landscape
         self.threshold = threshold
 
         self.pos = None       # latest position in frame coordinates
@@ -106,9 +105,9 @@ class PenTracker(threading.Thread):
                     wx = wy = None  # discard stale coords; wait for a fresh pair
 
     def _map(self, wx, wy):
+        # frames are always captured upright (see fw/fh in main()); rotate_point()
+        # applies --rotate uniformly to both the frame and this raw-space position
         fw, fh = self.frame_size
-        if self.landscape:
-            return wy / WACOM_MAX_Y * fw, wx / WACOM_MAX_X * fh
         return wx / WACOM_MAX_X * fw, (1 - wy / WACOM_MAX_Y) * fh
 
 
@@ -208,12 +207,13 @@ def parse_args():
         epilog="Example: ssh root@10.11.99.1 '~/restream -h 1872 -w 1404 -b 4"
                " -f :mem: -s 2621636' | lz4 -d | ./reView.py",
     )
-    parser.add_argument("--width", type=int, help="frame width in pixels (default: 1404, or 1872 with --landscape)")
-    parser.add_argument("--height", type=int, help="frame height in pixels (default: 1872, or 1404 with --landscape)")
-    parser.add_argument("--landscape", action="store_true", help="frames are in landscape orientation (reStream.sh -l)")
-    parser.add_argument("--rotate", type=int, default=0, choices=[0, 90, 180, 270],
-                        help="rotate the displayed image clockwise by this many degrees. Matches"
-                             " the working-tree reStream.sh: 0 = portrait (default), 90 = -l (landscape).")
+    parser.add_argument("--width", type=int, default=1404, help="raw frame width in pixels as captured by restream (default: 1404)")
+    parser.add_argument("--height", type=int, default=1872, help="raw frame height in pixels as captured by restream (default: 1872)")
+    parser.add_argument("--landscape", action="store_true", help="shorthand for --rotate 90 (reStream.sh -l); "
+                                                                   "frames are always captured upright regardless of this flag")
+    parser.add_argument("--rotate", type=int, choices=[0, 90, 180, 270],
+                        help="rotate the displayed image clockwise by this many degrees."
+                             " 0 = portrait (default), 90 = --landscape / reStream.sh -l.")
     parser.add_argument("--pixel-format", default="bgra", choices=["bgra", "gray8", "gray16be", "rgb565le"],
                         help="pixel format of the incoming frames (default: bgra)")
     parser.add_argument("--source", default=os.environ.get("REMARKABLE_IP", "10.11.99.1"),
@@ -244,11 +244,11 @@ def main():
         print("        | lz4 -d | ./reView.py", file=sys.stderr)
         return 1
 
-    fw = args.width or (1872 if args.landscape else 1404)
-    fh = args.height or (1404 if args.landscape else 1872)
+    fw, fh = args.width, args.height
+    rotate = args.rotate if args.rotate is not None else (90 if args.landscape else 0)
 
     # displayed dimensions after rotation (90/270 swap width and height)
-    disp_w, disp_h = (fh, fw) if args.rotate in (90, 270) else (fw, fh)
+    disp_w, disp_h = (fh, fw) if rotate in (90, 270) else (fw, fh)
 
     bytes_per_pixel, convert = make_converter(args.pixel_format)
     reader = FrameReader(fw * fh * bytes_per_pixel, convert)
@@ -256,8 +256,7 @@ def main():
 
     pen = None
     if not args.no_pen:
-        pen = PenTracker(args.source, args.event_device, (fw, fh),
-                         args.landscape, args.pressure_threshold)
+        pen = PenTracker(args.source, args.event_device, (fw, fh), args.pressure_threshold)
         pen.start()
 
     pygame.init()
@@ -289,9 +288,9 @@ def main():
             # .convert() drops the alpha channel: xochitl writes
             # alpha < 255 in places, which would blend into the background
             frame_surface = pygame.image.frombuffer(buffer, (fw, fh), pygame_format).convert()
-            if args.rotate:
+            if rotate:
                 # negative angle = clockwise; 90/180/270 are exact (no interpolation)
-                frame_surface = pygame.transform.rotate(frame_surface, -args.rotate)
+                frame_surface = pygame.transform.rotate(frame_surface, -rotate)
             scaled = None
             frames_shown += 1
             if args.exit_after and frames_shown >= args.exit_after:
@@ -323,7 +322,7 @@ def main():
                 radius = max(3.0, args.pen_size * scale / 2)
                 points = []
                 for x, y, t in trail_snap:
-                    rx, ry = rotate_point(x, y, fw, fh, args.rotate)
+                    rx, ry = rotate_point(x, y, fw, fh, rotate)
                     points.append((offset_x + rx * scale, offset_y + ry * scale, t))
                 for (x1, y1, _), (x2, y2, t2) in zip(points, points[1:]):
                     alpha = int(180 * max(0.0, 1 - (now - t2) / TRAIL_SECONDS))
@@ -332,7 +331,7 @@ def main():
 
                 if draw_cursor:
                     x, y = pen.pos
-                    rx, ry = rotate_point(x, y, fw, fh, args.rotate)
+                    rx, ry = rotate_point(x, y, fw, fh, rotate)
                     center = (offset_x + rx * scale, offset_y + ry * scale)
                     if pen.pressed:
                         pygame.draw.circle(overlay, (*pressed_rgb, 230), center, radius)
