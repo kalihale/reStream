@@ -12,7 +12,7 @@ rm2_firmware_version_3_24="3.24"
 
 # default values for arguments
 remarkable="${REMARKABLE_IP:-10.11.99.1}" # remarkable IP address
-portrait=true                             # rotate 90 degrees to the right
+portrait=false                            # rotate 90 degrees to the right
 cursor=false                              # show a cursor where the pen is hovering
 output_path=-                             # display output through ffplay
 format=-                                  # automatic output format
@@ -32,8 +32,8 @@ while [ $# -gt 0 ]; do
             echo "reStream version: v$version"
             exit
             ;;
-        -l | --landscape)
-            portrait=false
+        -p | --portrait)
+            portrait=true
             shift
             ;;
         -c | --cursor)
@@ -106,8 +106,8 @@ while [ $# -gt 0 ]; do
         -h | --help | *)
             echo "Usage: $0 [-p] [-c] [-u] [-s <source>] [-o <output>] [-f <format>] [-t <title>] [-m] [-w] [-d] [--hflip]"
             echo "Examples:"
-            echo "	$0                               # live view in portrait"
-            echo "	$0 -l                            # live view in landscape"
+            echo "	$0                               # live view in landscape"
+            echo "	$0 -p                            # live view in portrait"
             echo "	$0 -c                            # show a cursor where the pen is hovering (rM2 only)"
             echo "	$0 -s 192.168.0.10               # connect to different IP"
             echo "	$0 -o remarkable.mp4             # record to a file"
@@ -156,6 +156,7 @@ if ! ssh_cmd true; then
     exit 1
 fi
 
+pen_orientation_opt=""
 rm_version="$(ssh_cmd cat /sys/devices/soc0/machine)"
 
 case "$rm_version" in
@@ -180,7 +181,7 @@ case "$rm_version" in
             height=1404
             fb_file=":mem:"
 
-            # Use updated video settings?
+		# Use updated video settings?
             if is_current_rm_firmware_version_ge $rm2_firmware_version_3_24; then
                 echo "Using the newer :mem: video settings."
                 bytes_per_pixel=4
@@ -236,7 +237,7 @@ if ! lz4 -V >/dev/null; then
 fi
 
 # check if restream binay is present on remarkable
-if ssh_cmd "[ ! -f ~/restream ] && [ ! -f /opt/bin/restream ]"; then
+if ssh_cmd "[ ! -f ~/restream ] && [ ! -f /opt/bin/restream ] && [ ! -f /home/root/.vellum/bin/restream ]"; then
     echo "The restream binary is not installed on your reMarkable."
     echo "Please install it using the instruction in the README:"
     echo "https://github.com/rien/reStream/#installation"
@@ -303,7 +304,12 @@ set -e # stop if an error occurs
 restream_options="-h $height -w $width -b $bytes_per_pixel -f $fb_file -s $skip_offset"
 
 if "$cursor"; then
-    restream_options="$restream_options -c"
+    if [ -n "$pen_orientation_opt" ] && ssh_cmd "PATH=\"\$PATH:/opt/bin/:.\" restream --help 2>&1 | grep -q pen-orientation"; then
+        restream_options="$restream_options -c $pen_orientation_opt"
+    else
+        [ -n "$pen_orientation_opt" ] && echo "[reStream] Warning: restream binary on device does not support --pen-orientation; cursor will be misaligned on fw 3.27+. Reinstall restream.arm.static to fix." >&2
+        restream_options="$restream_options -c"
+    fi
 fi
 
 # shellcheck disable=SC2089

@@ -48,6 +48,22 @@ pub struct Opts {
     /// Memory offset
     #[arg(long, name = "skip", short = 's')]
     skip: usize,
+
+    /// Orientation of the framebuffer content, used to draw the pen cursor at the right
+    /// position. Inferred from width/height when omitted (landscape if width > height).
+    #[arg(long, value_enum)]
+    pen_orientation: Option<PenOrientation>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, clap::ValueEnum)]
+pub enum PenOrientation {
+    /// Landscape buffer (rM2 firmware before 3.24 with :mem:)
+    Landscape,
+    /// Upright portrait buffer (rM1, rm2fb, rM2 firmware 3.24+)
+    Portrait,
+    /// Portrait buffer rotated by 180 degrees (rM2 firmware 3.27+)
+    #[value(name = "portrait180")]
+    Portrait180,
 }
 
 fn main() -> Result<()> {
@@ -62,6 +78,12 @@ fn main() -> Result<()> {
         (opts.file.to_owned(), 0)
     };
 
+    let pen_orientation = opts.pen_orientation.unwrap_or(if opts.width > opts.height {
+        PenOrientation::Landscape
+    } else {
+        PenOrientation::Portrait
+    });
+
     let streamer = ReStreamer::init(
         &file,
         offset,
@@ -69,6 +91,7 @@ fn main() -> Result<()> {
         opts.height,
         opts.bytes_per_pixel,
         opts.show_cursor,
+        pen_orientation,
     )?;
 
     let stdout = std::io::stdout();
@@ -148,6 +171,7 @@ pub struct ReStreamer {
     bytes_per_pixel: usize,
 
     show_cursor: bool,
+    pen_orientation: PenOrientation,
     input_rx: Receiver<InputEvent>,
     pen_pos: Option<(usize, usize)>,
     drawing: bool,
@@ -161,6 +185,7 @@ impl ReStreamer {
         height: usize,
         bytes_per_pixel: usize,
         show_cursor: bool,
+        pen_orientation: PenOrientation,
     ) -> Result<ReStreamer> {
         let start = offset as u64;
         let size = width * height * bytes_per_pixel;
@@ -181,6 +206,7 @@ impl ReStreamer {
             height,
             bytes_per_pixel,
             show_cursor,
+            pen_orientation,
             input_rx,
             pen_pos: None,
             drawing: false,
@@ -246,10 +272,12 @@ impl ReStreamer {
 
             // Pen events are in display coordinates (1404x1872 portrait);
             // map them to a (row, column) position in the framebuffer.
-            let (pen_row, pen_col) = if self.width > self.height {
-                (ev_x as isize, width - ev_y as isize)
-            } else {
-                (ev_y as isize, ev_x as isize)
+            let (pen_row, pen_col) = match self.pen_orientation {
+                PenOrientation::Landscape => (ev_x as isize, width - ev_y as isize),
+                PenOrientation::Portrait => (ev_y as isize, ev_x as isize),
+                PenOrientation::Portrait180 => {
+                    (height - ev_y as isize, width - ev_x as isize)
+                }
             };
 
             for (i, (coff, no)) in PEN_IMAGE.iter().enumerate() {
