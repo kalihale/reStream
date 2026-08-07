@@ -13,7 +13,7 @@ rm2_firmware_version_3_27="3.27"
 
 # default values for arguments
 remarkable="${REMARKABLE_IP:-10.11.99.1}" # remarkable IP address
-portrait=true                             # rotate 90 degrees to the right
+portrait=false                            # rotate 90 degrees to the right
 cursor=false                              # show a cursor where the pen is hovering
 output_path=-                             # display output through ffplay
 format=-                                  # automatic output format
@@ -33,8 +33,8 @@ while [ $# -gt 0 ]; do
             echo "reStream version: v$version"
             exit
             ;;
-        -l | --landscape)
-            portrait=false
+        -p | --portrait)
+            portrait=true
             shift
             ;;
         -c | --cursor)
@@ -107,8 +107,8 @@ while [ $# -gt 0 ]; do
         -h | --help | *)
             echo "Usage: $0 [-p] [-c] [-u] [-s <source>] [-o <output>] [-f <format>] [-t <title>] [-m] [-w] [-d] [--hflip]"
             echo "Examples:"
-            echo "	$0                               # live view in portrait"
-            echo "	$0 -l                            # live view in landscape"
+            echo "	$0                               # live view in landscape"
+            echo "	$0 -p                            # live view in portrait"
             echo "	$0 -c                            # show a cursor where the pen is hovering (rM2 only)"
             echo "	$0 -s 192.168.0.10               # connect to different IP"
             echo "	$0 -o remarkable.mp4             # record to a file"
@@ -238,7 +238,7 @@ if ! lz4 -V >/dev/null; then
 fi
 
 # check if restream binay is present on remarkable
-if ssh_cmd "[ ! -f ~/restream ] && [ ! -f /opt/bin/restream ]"; then
+if ssh_cmd "[ ! -f ~/restream ] && [ ! -f /opt/bin/restream ] && [ ! -f /home/root/.vellum/bin/restream ]"; then
     echo "The restream binary is not installed on your reMarkable."
     echo "Please install it using the instruction in the README:"
     echo "https://github.com/rien/reStream/#installation"
