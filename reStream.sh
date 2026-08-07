@@ -181,7 +181,7 @@ case "$rm_version" in
             height=1404
             fb_file=":mem:"
 
-		# Use updated video settings?
+            # Use updated video settings?
             if is_current_rm_firmware_version_ge $rm2_firmware_version_3_24; then
                 echo "Using the newer :mem: video settings."
                 bytes_per_pixel=4
