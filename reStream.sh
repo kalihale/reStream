@@ -7,6 +7,7 @@ version="1.5.0"
 # https://ffmpeg.org/doxygen/trunk/pixfmt_8h_source.html
 # https://ffmpeg.org/ffmpeg-filters.html#eq
 
+rm2_firmware_version_3_7="3.7.0.1930"
 rm2_firmware_version_3_24="3.24"
 
 # default values for arguments
