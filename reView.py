@@ -13,7 +13,7 @@ pipes indefinitely, so don't route through reStream.sh -o pipe:1):
     ssh root@10.11.99.1 '~/restream -h 1872 -w 1404 -b 4 -f :mem: -s 2629636' \
         | lz4 -d | ./reView.py
 
-Keys: Esc/q quit.
+Keys: q quit. F11/f fullscreen. ESC leaves fullscreen.
 """
 
 import argparse
@@ -211,11 +211,10 @@ def parse_args():
     )
     parser.add_argument("--width", type=int, default=1404, help="raw frame width in pixels as captured by restream (default: 1404)")
     parser.add_argument("--height", type=int, default=1872, help="raw frame height in pixels as captured by restream (default: 1872)")
-    parser.add_argument("--landscape", action="store_true", help="shorthand for --rotate 90 (reStream.sh -l); "
-                                                                   "frames are always captured upright regardless of this flag")
+    parser.add_argument("-p", "--portrait", action="store_true", help="show the screen in portrait (default: landscape). Frames are always captured upright regardless of this flag")
     parser.add_argument("--rotate", type=int, choices=[0, 90, 180, 270],
                         help="rotate the displayed image clockwise by this many degrees."
-                             " 0 = portrait (default), 90 = --landscape / reStream.sh -l.")
+                             " 0 = portrait, 90 = landscape (default)")
     parser.add_argument("--pixel-format", default="bgra", choices=["bgra", "gray8", "gray16be", "rgb565le"],
                         help="pixel format of the incoming frames (default: bgra)")
     parser.add_argument("--source", default=os.environ.get("REMARKABLE_IP", "10.11.99.1"),
@@ -248,7 +247,7 @@ def main():
         return 1
 
     fw, fh = args.width, args.height
-    rotate = args.rotate if args.rotate is not None else (90 if args.landscape else 0)
+    rotate = args.rotate if args.rotate is not None else (0 if args.portrait else 90)
 
     # displayed dimensions after rotation (90/270 swap width and height)
     disp_w, disp_h = (fh, fw) if rotate in (90, 270) else (fw, fh)

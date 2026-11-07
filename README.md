@@ -1,4 +1,89 @@
+# reView
+
+**By kalihale**
+
+## Requirements
+
+On **host** machine:
+
+- Python binary named exactly `python3.12`
+- `pygame` installed (pygame 2)
+  - Install with `python3.12 -m pip install pygame`
+- `ssh`
+  - Use the same key setup as reStream Installation.
+- `lz4`
+- ffmpeg *not* required for reView, `numpy` not required
+
+On device:
+
+- rM2 3.24 or later
+- `framebuffer-spy`, `xovi`, and `xovi-message-broker` installed (via vellum has been tested)
+- Upstream binary (1.5.0)
+
+Install location: The `restream` binary must be at `/home/root/restream` (use the wget or scp method in the reStream section)
+
+## Usage
+
+Clone this repo (or download the zip) and run `chmod +x reView.sh`. `reView.sh` and `reView.py` must be in the same folder.
+
+`./reView.sh [options]`
+
+### Options:
+
+`-p`/`--portrait`: Starts reView in portrait mode (default: landscape)
+
+`--fullscreen`: Starts reView in fullscreen (default: windowed)
+
+`--pen-color`: Uses any pygame/X11 color or 6-digit hex (default: red)
+
+`--trail-color`: Uses any pygame/X11 color or 6-digit hex (default: pen-color)
+
+`--pressed-color`: Uses any pygame/X11 color or 6-digit hex (default: pen-color)
+
+`--pen-size`: Pen size in pixels on reMarkable's screen (default: 18; never drawn smaller than 6px circle)
+
+`--title`: Changes the title of the viewer window's title bar (default: reStream)
+
+`--no-pen`: Does not display pen tracking (default: false)
+
+### Keys
+
+`q`: Quit
+
+`F11`/`f`: Toggle fullscreen
+
+`ESC`: Leave fullscreen
+
+## Differences from reStream
+
+Pen tracking is drawn in window on host, not in the framebuffer itself. This results in faster pen tracking with a trail that fades and ✨colors!✨ for the pen.
+
+ESC does not exit the program, it only exits fullscreen. Use `q`, the "x" on the window itself, or CTRL+C in the terminal to quit.
+
+No support for reStream's `-o`, `-w`, `-u`, `-m`, or `-d` (record, webcam, unsecure, measure, dark mode).
+
+## Troubleshooting
+
+`framebuffer-spy: no framebuffer address yet ... draw on the screen once and retry`: Draw on the tablet once and run again.
+
+Scrambled picture or offset picture: `framebuffer-spy` lookup likely failed, fallback offset was used.
+
+## NOTES
+
+I only have the rM2, so this is specifically for the rM2. If anyone has other devices, feel free to open a pull request. Please ensure you've tested thoroughly since I can't test anything but the rM2 myself.
+
+Tested on Linux (Pop!_OS). Again, feel free to open a pull request to add specifics for Windows or Mac, I cannot test on either platform so please test thoroughly.
+
+This version of reStream.sh differs in a couple of ways from the upstream version:
+
+- framebuffer-spy is used to get the framebuffer on 3.24+.
+- 3.24 and 3.27 have been merged (the split was introduced upstream as a consequence of a bug on my own end, it should not have been split). Tested on 3.27.
+- reStream download section will still fetch upstream version - the upstream binary works fine with this fork, so this is fine. Download the rest as a zip from this repo.
+- IP: WiFi connection is untested. `--source` is not implemented. I'll get to this eventually.
+
 # reStream
+
+(This README is unchanged from upstream rien/reStream as of 2026-11-07)
 
 reMarkable screen sharing over SSH.
 
@@ -212,3 +297,4 @@ than I do, so please consider supporting a local charity instead. Preferably one
 that promotes diversity in technology like
 [GirlsWhoCode](https://girlswhocode.com/), [CoderDojo](https://coderdojo.com/),
 etc.
+

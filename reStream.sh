@@ -13,7 +13,7 @@ rm2_firmware_version_3_27="3.27"
 
 # default values for arguments
 remarkable="${REMARKABLE_IP:-10.11.99.1}" # remarkable IP address
-portrait=false                            # rotate 90 degrees to the right
+landscape=true                            # rotate 90 degrees to the right
 cursor=false                              # show a cursor where the pen is hovering
 output_path=-                             # display output through ffplay
 format=-                                  # automatic output format
@@ -34,7 +34,7 @@ while [ $# -gt 0 ]; do
             exit
             ;;
         -p | --portrait)
-            portrait=true
+            landscape=false
             shift
             ;;
         -c | --cursor)
@@ -221,7 +221,6 @@ case "$rm_version" in
                 echo "Using the newer :mem: video settings."
                 bytes_per_pixel=4
                 pixel_format="bgra"
-                video_filters="$video_filters,transpose=1"
 
                 tmp=$height
                 height=$width
@@ -302,8 +301,8 @@ fi
 # store extra ffmpeg arguments in $@
 set --
 
-# rotate 90 degrees if portrait=true
-$portrait && video_filters="$video_filters,transpose=2"
+# rotate 90 degrees if landscape=true
+$landscape && video_filters="$video_filters,transpose=1"
 
 # Scale and add padding if we are targeting a webcam because a lot of services
 # expect a size of exactly 1280x720 (tested in Firefox, MS Teams, and Skype for
@@ -355,7 +354,7 @@ if "$cursor"; then
 fi
 
 # shellcheck disable=SC2089
-restream_rs="PATH=\"\$PATH:/opt/bin/:.\" restream $restream_options"
+restream_rs="PATH=\"\$PATH:/opt/bin/:/home/root/.vellum/bin:.\" restream $restream_options"
 if $unsecure_connection; then
     listen_port=16789
     ssh_cmd "$restream_rs --listen $listen_port" &
