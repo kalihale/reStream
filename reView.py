@@ -72,7 +72,9 @@ class PenTracker(threading.Thread):
     def run(self):
         cmd = ["ssh", *SSH_OPTIONS, "root@%s" % self.host, "cat", self.device]
         try:
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+            # stdin is the video pipe; if ssh inherited it, it would forward
+            # (and so steal) frame bytes, misaligning every later frame
+            proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
         except OSError as e:
             print("[reView] could not start ssh for pen events: %s" % e, file=sys.stderr)
             return
@@ -232,6 +234,7 @@ def parse_args():
     parser.add_argument("--no-pen", action="store_true", help="disable the pen cursor overlay")
     parser.add_argument("--exit-after", type=int, default=0, help="exit after N frames (for testing)")
     parser.add_argument("--screenshot", help="save the window to this PNG just before exit (for testing)")
+    parser.add_argument("--fullscreen", action="store_true", help="start fullscreen (toggle with F11 or f)")
     return parser.parse_args()
 
 
@@ -262,7 +265,15 @@ def main():
     pygame.init()
     pygame.display.set_caption(args.title)
     init_scale = min(900 / disp_h, 1400 / disp_w, 1.0)
-    window = pygame.display.set_mode((int(disp_w * init_scale), int(disp_h * init_scale)), pygame.RESIZABLE)
+    windowed_size = (int(disp_w * init_scale), int(disp_h * init_scale))
+    fullscreen = args.fullscreen
+
+    def set_window(full):
+        if full:
+            return pygame.display.set_mode((0,0), pygame.FULLSCREEN)
+        return pygame.display.set_mode(windowed_size, pygame.RESIZABLE)
+
+    window = set_window(fullscreen)
     clock = pygame.time.Clock()
     pen_rgb = tuple(pygame.Color(args.pen_color))[:3]
     trail_rgb = tuple(pygame.Color(args.trail_color))[:3] if args.trail_color else pen_rgb
@@ -277,10 +288,19 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            elif event.type == pygame.KEYDOWN and event.key in (pygame.K_ESCAPE, pygame.K_q):
+            elif event.type == pygame.KEYDOWN and event.key in (pygame.K_q,):
                 running = False
             elif event.type == pygame.VIDEORESIZE:
                 scaled = None
+            elif event.type == pygame.KEYDOWN and event.key in (pygame.K_F11, pygame.K_f):
+                if not fullscreen:
+                    windowed_size = window.get_size()
+                fullscreen = not fullscreen
+                window = set_window(fullscreen)
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE and fullscreen:
+                fullscreen = False
+                window = set_window(fullscreen)
+
 
         latest = reader.take()
         if latest is not None:
@@ -354,7 +374,7 @@ def main():
         # pipeline, so kill restream on the tablet like reStream.sh's trap
         subprocess.run(["ssh", *SSH_OPTIONS, "root@%s" % args.source,
                         "killall restream 2>/dev/null; true"],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                       stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return 0
 
 

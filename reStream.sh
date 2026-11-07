@@ -135,6 +135,40 @@ is_current_rm_firmware_version_ge() {
     test "$(printf '%s\n' "$current_rm_firmware_version" "$1" | sort -rV | head -n 1)" = "$current_rm_firmware_version"
 }
 
+# use framebuffer-spy to get address
+fb_skip_offset_from_xovi() {
+    offset=$(ssh_cmd 'sh -s' <<"REMOTE"
+if ! [ -p /run/xovi-mb ] || ! [ -p /run/xovi-mb-out ]; then
+    echo "framebuffer-spy: xovi-message-broker pipes not present" >&2
+    exit 1
+fi
+# avoid block here
+cfg=$(timeout 3 sh -c 'echo ">eframebuffer-spy\$getConfigString:" > /run/xovi-mb; cat /run/xovi-mb-out')
+fb=${cfg%%,*}
+case "$fb" in
+    0x*) ;;
+    *) echo "framebuffer-spy: no framebuffer address yet (got '${cfg:-<empty>}'); draw on the screen once and retry" >&2; exit 1 ;;
+esac
+pid=$(pidof xochitl)
+if [ -z "$pid" ]; then
+    echo "framebuffer-spy: xochitl not running" >&2
+    exit 1
+fi
+
+base=$(awk -F- '/\/dev\/fb0$/{getline; print $1; exit}' "/proc/$pid/maps")
+if [ -z "$base" ]; then
+    echo "framebuffer-spy: no /dev/fb0 mapping in xochitl" >&2
+    exit 1
+fi
+echo $(( fb - 0x$base ))
+REMOTE
+    )
+    case "$offset" in
+        '' | *[!0-9]*) return 1 ;;
+        *) echo "$offset" ;;
+    esac
+}
+
 # kill reStream on remarkable at the end.
 # shellcheck disable=SC2016
 exit_rm() {
@@ -193,7 +227,14 @@ case "$rm_version" in
                 height=$width
                 width=$tmp
 
-                skip_offset=2629636
+                # use framebuffer-spy offset if installed, otherwise fall back to known value
+                skip_offset=$(fb_skip_offset_from_xovi)
+                if [ -n "$skip_offset" ]; then
+                    echo "Using framebuffer-spy skip_offset=$skip_offset."
+                else
+                    skip_offset=2629636
+                    echo "framebuffer-spy unavailable; using default skip_offset=$skip_offset."
+                fi
 
             # Use the previous video settings.
             elif is_current_rm_firmware_version_ge $rm2_firmware_version_3_7; then
