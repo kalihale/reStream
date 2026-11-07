@@ -77,7 +77,7 @@ Tested on Linux (Pop!_OS). Again, feel free to open a pull request to add specif
 This version of reStream.sh differs in a couple of ways from the upstream version:
 
 - framebuffer-spy is used to get the framebuffer on 3.24+.
-- 3.24 and 3.27 have been merged (the split was introduced upstream as a consequence of a bug on my own end, it should not have been split). Tested on 3.27.
+- 3.24 and 3.27 have been merged (the split was introduced upstream as a consequence of a bug on my own end, it should not have been split). Tested on 3.27, 3.28, and 3.29.
 - reStream download section will still fetch upstream version - the upstream binary works fine with this fork, so this is fine. Download the rest as a zip from this repo.
 - IP: WiFi connection is untested. `--source` is not implemented. I'll get to this eventually.
 
